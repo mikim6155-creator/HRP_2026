@@ -12,9 +12,10 @@ if 'submitted' not in st.session_state:
 if 'trigger_popup' not in st.session_state:
     st.session_state.trigger_popup = False
 
-# [3] CSS 설정 (버튼 색상 및 체크박스 스타일 고정)
+# [3] CSS 설정: 버튼 색상 및 스타일 완벽 고정
 st.markdown("""
     <style>
+    /* 1. 사이드바 제출 버튼 (파란색) */
     div.stSidebar div.stButton > button[kind="primary"] {
         background-color: #007BFF !important;
         color: white !important;
@@ -24,6 +25,8 @@ st.markdown("""
         width: 100% !important;
         border-radius: 10px !important;
     }
+
+    /* 2. 소상공인지식배움터 바로가기 버튼 (하늘색) */
     [data-testid="stLinkButton"] a {
         background-color: #87CEEB !important;
         color: white !important;
@@ -36,6 +39,8 @@ st.markdown("""
         border-radius: 8px !important;
         text-decoration: none !important;
     }
+
+    /* 3. 수강방법 PDF 가이드 다운로드 버튼 (연한 딸기우유색) */
     [data-testid="stDownloadButton"] button {
         background-color: #FFD1DC !important;
         color: #555555 !important;
@@ -45,6 +50,8 @@ st.markdown("""
         width: 100% !important;
         border-radius: 8px !important;
     }
+
+    /* 4. 비활성화 체크박스 글자색 검정 고정 */
     div[data-testid="stCheckbox"] label[data-disabled="true"] p {
         color: #31333F !important;
         opacity: 1 !important;
@@ -101,30 +108,46 @@ if os.path.exists(EXCEL_PATH):
         'email': st.sidebar.text_input("이메일", placeholder="example@mail.com")
     }
 
-    # 수강 현황 계산을 위한 데이터 처리
+    # 수강 현황 계산용 루프
     selected_data = []
     cur_common_h, cur_special_h = 0.0, 0.0
     sel_special_ind = None
-    
-    # 시간 계산 루프
     for i, row in df_lectures.iterrows():
         std_cat = "필수교육" if "필수" in str(row['대분류']) else ("업종공통" if "업종공통" in str(row['대분류']) else "업종특화")
         key = f"{std_cat}_{row['중분류']}_{row['강의명']}_{i}"
-        
         if st.session_state.get(key) or ("필수" in str(row['대분류'])):
             if "업종공통" in std_cat: cur_common_h += float(row['시간'])
             if "업종특화" in std_cat: 
                 cur_special_h += float(row['시간'])
                 sel_special_ind = row['중분류']
 
-    # 메인 화면: 안내사항
+    # --- [복구 완료] 메인 화면 타이틀 및 안내사항 ---
     st.title("🎓 2026년 희망리턴패키지 실전 온라인교육 수강목록")
     with st.container(border=True):
         st.subheader("📢 필독! 안내사항")
-        st.markdown(f"1. 왼쪽 화면의 **교육생 정보**를 입력해 주세요. 모바일로 볼 경우 왼쪽 상단 '** >> **' 눌러주세요.")
-        st.link_button("📖 소상공인지식배움터 바로가기", "https://edu.sbiz.or.kr/", use_container_width=True)
+        st.markdown(f"""
+        먼저 **2026년 희망리턴패키지 재기사업화 최종 선정**되신 것을 진심으로 축하드립니다.  
+        선정 되신 이후에는 반드시 **실전교육(24H)**을 수료 하셔야 합니다. (대면7H+온라인17H= 총 24H)  
+        실전교육 미수료 시 **선정취소 처리**되는 점 유의하시기 바랍니다.
 
-    # 강의 리스트 (체크박스 영역)
+        1. 왼쪽 화면의 **교육생 정보**를 입력해 주세요. 모바일로 볼 경우 왼쪽 상단 "** >> **" 눌러주세요.
+        2. 아래 **필수교육+업종공통+업종특화** 강의목록을 보고 수강 할 과목을 선택 해 주세요.
+        3. **필수교육**은 무조건 수강을 하셔야 합니다.
+        4. **업종공통(6.5H)** 및 **업종특화(7H)**는 기준 시간 충족 시 추가 선택이 제한됩니다.
+        5. 왼쪽 총 수강 시간이 **"{TARGET_TOTAL_HOURS}H"**가 되어야 만 **제출버튼**이 생성됩니다.
+        6. 제출 후 **"내 수강신청 현황"** 팝업창이 뜨면 **화면캡쳐**를 한 뒤 강의를 수강해주세요.
+        """)
+        
+        # 버튼 영역 복구
+        col_btn1, col_btn2 = st.columns(2)
+        with col_btn1:
+            st.link_button("📖 소상공인지식배움터 바로가기", "https://edu.sbiz.or.kr/", use_container_width=True)
+        with col_btn2:
+            if os.path.exists(PDF_PATH):
+                with open(PDF_PATH, "rb") as f:
+                    st.download_button("📄 수강방법 PDF 가이드 다운로드", f, "guide.pdf", "application/pdf", use_container_width=True)
+
+    # 강의 리스트 영역
     cats = {"필수교육": "필수", "업종공통": "업종공통", "업종특화": "업종특화"}
     for label, kw in cats.items():
         st.header(f"📂 {label}")
@@ -136,18 +159,16 @@ if os.path.exists(EXCEL_PATH):
                     key = f"{label}_{s_label}_{row['강의명']}_{i}"
                     is_m = (label == "필수교육")
                     is_d = st.session_state.submitted
-                    
                     if not is_m and not is_d:
                         if label == "업종공통" and not st.session_state.get(key) and cur_common_h >= TARGET_COMMON_HOURS: is_d = True
                         if label == "업종특화" and not st.session_state.get(key):
                             if cur_special_h >= TARGET_SPECIAL_HOURS or (sel_special_ind and sel_special_ind != s_label): is_d = True
-                    
                     chk = st.checkbox(f"{row['강의명']} ({row['시간']}H)", key=key, value=is_m, disabled=is_d)
                     if chk:
                         temp = row.to_dict(); temp['표준대분류'] = label
                         selected_data.append(temp)
 
-    # [💡 핵심 복구] 사이드바 실시간 수강 현황 (4단 지표 고정)
+    # --- [복구 완료] 사이드바 4단 실시간 수강 현황 ---
     r_df = pd.DataFrame(selected_data)
     t_h = r_df["시간"].sum() if not r_df.empty else 0.0
     m_h = r_df[r_df["표준대분류"] == "필수교육"]["시간"].sum() if not r_df.empty else 0.0
@@ -163,11 +184,10 @@ if os.path.exists(EXCEL_PATH):
 
     valid = (t_h >= TARGET_TOTAL_HOURS and m_h >= TARGET_MANDATORY_HOURS and c_h >= TARGET_COMMON_HOURS and s_h >= TARGET_SPECIAL_HOURS)
 
-    # 제출 로직 및 사이드바 상태 반영
+    # 제출 상태 및 팝업 로직
     if st.session_state.submitted:
         st.sidebar.info("✅ 신청이 완료되었습니다.")
         st.sidebar.button("전송 완료", type="secondary", disabled=True)
-        # 만약 제출 직후라면 팝업을 띄움
         if st.session_state.trigger_popup:
             st.session_state.trigger_popup = False
             show_confirmation_dialog(r_df, u_info)
@@ -175,16 +195,12 @@ if os.path.exists(EXCEL_PATH):
         st.sidebar.success("✅ 모든 이수 요건 충족!")
         if st.sidebar.button("최종 수강목록 확인 및 제출", type="primary"):
             if u_info['name'] and u_info['biz'] and u_info['phone']:
-                # 데이터 저장
                 save_df = r_df.copy()
                 save_df['제출시간'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 save_df['성함'], save_df['업체명'], save_df['연락처'] = u_info['name'], u_info['biz'], u_info['phone']
                 save_df['이메일'], save_df['구분'] = u_info['email'], u_info['category']
-                
                 if not os.path.exists(SAVE_PATH): save_df.to_csv(SAVE_PATH, index=False, encoding='utf-8-sig')
                 else: save_df.to_csv(SAVE_PATH, mode='a', header=False, index=False, encoding='utf-8-sig')
-                
-                # 상태 변경 후 '새로고침'하여 사이드바를 먼저 업데이트하고, 그 다음 팝업을 띄움
                 st.session_state.submitted = True
                 st.session_state.trigger_popup = True
                 st.rerun()
