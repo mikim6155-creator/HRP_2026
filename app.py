@@ -2,20 +2,26 @@ import streamlit as st
 import pandas as pd
 import os
 from datetime import datetime
+from streamlit_gsheets import GSheetsConnection # [추가] 구글 시트 연결 라이브러리
 
 # [1] 페이지 설정
 st.set_page_config(page_title="2026년 희망리턴패키지 온라인교육", page_icon="🎓", layout="wide")
 
-# [2] 상태 초기화
+# [2] 구글 스프레드시트 연결 설정 (Secrets 설정 필요)
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+except:
+    st.error("구글 시트 연결 설정(Secrets)이 필요합니다.")
+
+# [3] 상태 초기화 (로직 고정)
 if 'submitted' not in st.session_state:
     st.session_state.submitted = False
 if 'trigger_popup' not in st.session_state:
     st.session_state.trigger_popup = False
 
-# [3] CSS 설정: 버튼 색상 및 스타일 완벽 고정
+# [4] CSS 설정 (버튼 색상 및 체크박스 스타일 절대 고정)
 st.markdown("""
     <style>
-    /* 1. 사이드바 제출 버튼 (파란색) */
     div.stSidebar div.stButton > button[kind="primary"] {
         background-color: #007BFF !important;
         color: white !important;
@@ -25,8 +31,6 @@ st.markdown("""
         width: 100% !important;
         border-radius: 10px !important;
     }
-
-    /* 2. 소상공인지식배움터 바로가기 버튼 (하늘색) */
     [data-testid="stLinkButton"] a {
         background-color: #87CEEB !important;
         color: white !important;
@@ -39,8 +43,6 @@ st.markdown("""
         border-radius: 8px !important;
         text-decoration: none !important;
     }
-
-    /* 3. 수강방법 PDF 가이드 다운로드 버튼 (연한 딸기우유색) */
     [data-testid="stDownloadButton"] button {
         background-color: #FFD1DC !important;
         color: #555555 !important;
@@ -50,8 +52,6 @@ st.markdown("""
         width: 100% !important;
         border-radius: 8px !important;
     }
-
-    /* 4. 비활성화 체크박스 글자색 검정 고정 */
     div[data-testid="stCheckbox"] label[data-disabled="true"] p {
         color: #31333F !important;
         opacity: 1 !important;
@@ -59,7 +59,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# [4] 경로 및 기준 시간 설정
+# [5] 경로 및 기준 시간 설정 (절대 고정)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 EXCEL_PATH = os.path.join(BASE_DIR, "강의목록.xlsx")
 PDF_PATH = os.path.join(BASE_DIR, "guide.pdf")
@@ -68,7 +68,7 @@ SAVE_PATH = os.path.join(BASE_DIR, "수강신청현황.csv")
 TARGET_TOTAL_HOURS, TARGET_MANDATORY_HOURS = 17.0, 3.5
 TARGET_COMMON_HOURS, TARGET_SPECIAL_HOURS = 6.5, 7.0
 
-# [5] 최종 확인 팝업창 함수
+# [6] 최종 확인 팝업창 함수 (3단 구성 고정)
 @st.dialog("📝 최종 수강 신청 완료", width="large")
 def show_confirmation_dialog(data, user_info):
     st.balloons()
@@ -90,7 +90,7 @@ def show_confirmation_dialog(data, user_info):
     st.info("✅ 제출완료. 소상공인지식배움터에 접속하여 강의명 검색 후 수강하시기 바랍니다.")
     st.error("⚠️ 촬영을 완료하셨다면 우측 상단의 'X'를 눌러 팝업을 닫아주세요.")
 
-# [6] 데이터 로드 및 메인 로직
+# [7] 메인 로직
 if os.path.exists(EXCEL_PATH):
     @st.cache_data
     def load_data(path):
@@ -98,7 +98,7 @@ if os.path.exists(EXCEL_PATH):
         return df.rename(columns={"과정명": "강의명"}) if "과정명" in df.columns else df
     df_lectures = load_data(EXCEL_PATH)
 
-    # 사이드바: 교육생 정보
+    # 사이드바: 정보 입력
     st.sidebar.header("👤 교육생 정보")
     u_info = {
         'name': st.sidebar.text_input("성함", placeholder="이름 입력"),
@@ -108,7 +108,7 @@ if os.path.exists(EXCEL_PATH):
         'email': st.sidebar.text_input("이메일", placeholder="example@mail.com")
     }
 
-    # 수강 현황 계산용 루프
+    # 시간 계산 (고정 로직)
     selected_data = []
     cur_common_h, cur_special_h = 0.0, 0.0
     sel_special_ind = None
@@ -121,7 +121,7 @@ if os.path.exists(EXCEL_PATH):
                 cur_special_h += float(row['시간'])
                 sel_special_ind = row['중분류']
 
-    # --- [복구 완료] 메인 화면 타이틀 및 안내사항 ---
+    # --- 메인 화면: 안내사항 컨테이너 복구 완료 ---
     st.title("🎓 2026년 희망리턴패키지 실전 온라인교육 수강목록")
     with st.container(border=True):
         st.subheader("📢 필독! 안내사항")
@@ -138,7 +138,6 @@ if os.path.exists(EXCEL_PATH):
         6. 제출 후 **"내 수강신청 현황"** 팝업창이 뜨면 **화면캡쳐**를 한 뒤 강의를 수강해주세요.
         """)
         
-        # 버튼 영역 복구
         col_btn1, col_btn2 = st.columns(2)
         with col_btn1:
             st.link_button("📖 소상공인지식배움터 바로가기", "https://edu.sbiz.or.kr/", use_container_width=True)
@@ -147,7 +146,7 @@ if os.path.exists(EXCEL_PATH):
                 with open(PDF_PATH, "rb") as f:
                     st.download_button("📄 수강방법 PDF 가이드 다운로드", f, "guide.pdf", "application/pdf", use_container_width=True)
 
-    # 강의 리스트 영역
+    # 강의 선택 영역 (체크박스 고정)
     cats = {"필수교육": "필수", "업종공통": "업종공통", "업종특화": "업종특화"}
     for label, kw in cats.items():
         st.header(f"📂 {label}")
@@ -168,7 +167,7 @@ if os.path.exists(EXCEL_PATH):
                         temp = row.to_dict(); temp['표준대분류'] = label
                         selected_data.append(temp)
 
-    # --- [복구 완료] 사이드바 4단 실시간 수강 현황 ---
+    # --- 사이드바 4단 실시간 수강 현황 복구 완료 ---
     r_df = pd.DataFrame(selected_data)
     t_h = r_df["시간"].sum() if not r_df.empty else 0.0
     m_h = r_df[r_df["표준대분류"] == "필수교육"]["시간"].sum() if not r_df.empty else 0.0
@@ -184,7 +183,7 @@ if os.path.exists(EXCEL_PATH):
 
     valid = (t_h >= TARGET_TOTAL_HOURS and m_h >= TARGET_MANDATORY_HOURS and c_h >= TARGET_COMMON_HOURS and s_h >= TARGET_SPECIAL_HOURS)
 
-    # 제출 상태 및 팝업 로직
+    # [💡 핵심] 제출 및 실시간 구글 시트 연동 로직
     if st.session_state.submitted:
         st.sidebar.info("✅ 신청이 완료되었습니다.")
         st.sidebar.button("전송 완료", type="secondary", disabled=True)
@@ -195,12 +194,26 @@ if os.path.exists(EXCEL_PATH):
         st.sidebar.success("✅ 모든 이수 요건 충족!")
         if st.sidebar.button("최종 수강목록 확인 및 제출", type="primary"):
             if u_info['name'] and u_info['biz'] and u_info['phone']:
+                # 1. 데이터 정리
                 save_df = r_df.copy()
                 save_df['제출시간'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 save_df['성함'], save_df['업체명'], save_df['연락처'] = u_info['name'], u_info['biz'], u_info['phone']
                 save_df['이메일'], save_df['구분'] = u_info['email'], u_info['category']
+                save_cols = ['제출시간', '성함', '업체명', '연락처', '이메일', '구분', '표준대분류', '중분류', '강의명', '시간']
+                save_df = save_df[save_cols]
+
+                # 2. 로컬 CSV 저장 (백업용)
                 if not os.path.exists(SAVE_PATH): save_df.to_csv(SAVE_PATH, index=False, encoding='utf-8-sig')
                 else: save_df.to_csv(SAVE_PATH, mode='a', header=False, index=False, encoding='utf-8-sig')
+                
+                # 3. [추가] 구글 스프레드시트 실시간 연동
+                try:
+                    existing_data = conn.read(worksheet="Sheet1")
+                    updated_data = pd.concat([existing_data, save_df], ignore_index=True)
+                    conn.update(worksheet="Sheet1", data=updated_data)
+                except:
+                    pass # 구글 시트 연결 전에는 조용히 CSV만 저장함
+
                 st.session_state.submitted = True
                 st.session_state.trigger_popup = True
                 st.rerun()
