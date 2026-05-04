@@ -13,7 +13,7 @@ try:
 except:
     st.error("구글 시트 Secrets 설정이 필요합니다.")
 
-# [3] 상태 초기화 (로직 고정)
+# [3] 상태 초기화 (절대 고정)
 if 'submitted' not in st.session_state:
     st.session_state.submitted = False
 if 'trigger_popup' not in st.session_state:
@@ -114,6 +114,7 @@ if os.path.exists(EXCEL_PATH):
         'email': st.sidebar.text_input("이메일", placeholder="example@mail.com")
     }
 
+    # 시간 실시간 계산 루프 (절대 고정)
     selected_data = []
     cur_common_h, cur_special_h = 0.0, 0.0
     sel_special_ind = None
@@ -126,7 +127,7 @@ if os.path.exists(EXCEL_PATH):
                 cur_special_h += float(row['시간'])
                 sel_special_ind = row['중분류']
 
-    # --- [복구 완료] 안내사항 및 PDF 버튼 상자 (절대 고정) ---
+    # --- [복구 및 고정] 안내사항 및 PDF 버튼 상자 ---
     st.title("🎓 2026년 희망리턴패키지 실전 온라인교육 수강목록")
     with st.container(border=True):
         st.subheader("📢 필독! 안내사항")
@@ -151,28 +152,38 @@ if os.path.exists(EXCEL_PATH):
                 with open(PDF_PATH, "rb") as f:
                     st.download_button("📄 수강방법 PDF 가이드 다운로드", f, "guide.pdf", "application/pdf", use_container_width=True)
 
-    # 강의 선택 영역
-    cats = {"필수교육": "필수", "업종공통": "업종공통", "업종특화": "업종특화"}
+    # [💡 수정 포인트] 강의 선택 영역 - 헤더에 시간 표기 추가
+    cats = {
+        f"필수교육({TARGET_MANDATORY_HOURS}H)": "필수", 
+        f"업종공통({TARGET_COMMON_HOURS}H)": "업종공통", 
+        f"업종특화({TARGET_SPECIAL_HOURS}H)": "업종특화"
+    }
+
     for label, kw in cats.items():
         st.header(f"📂 {label}")
+        # 데이터 저장을 위한 순수 카테고리명 추출 (괄호 제거)
+        pure_cat = label.split('(')[0] 
+        
         m_df = df_lectures[df_lectures["대분류"].str.contains(kw, na=False)]
         for s_label in m_df["중분류"].unique():
             with st.expander(f"➕ {s_label}", expanded=True):
                 s_df = m_df[m_df["중분류"] == s_label]
                 for i, row in s_df.iterrows():
-                    key = f"{label}_{s_label}_{row['강의명']}_{i}"
-                    is_m = (label == "필수교육")
+                    key = f"{pure_cat}_{s_label}_{row['강의명']}_{i}"
+                    is_m = (pure_cat == "필수교육")
                     is_d = st.session_state.submitted
+                    
                     if not is_m and not is_d:
-                        if label == "업종공통" and not st.session_state.get(key) and cur_common_h >= TARGET_COMMON_HOURS: is_d = True
-                        if label == "업종특화" and not st.session_state.get(key):
+                        if pure_cat == "업종공통" and not st.session_state.get(key) and cur_common_h >= TARGET_COMMON_HOURS: is_d = True
+                        if pure_cat == "업종특화" and not st.session_state.get(key):
                             if cur_special_h >= TARGET_SPECIAL_HOURS or (sel_special_ind and sel_special_ind != s_label): is_d = True
+                    
                     chk = st.checkbox(f"{row['강의명']} ({row['시간']}H)", key=key, value=is_m, disabled=is_d)
                     if chk:
-                        temp = row.to_dict(); temp['표준대분류'] = label
+                        temp = row.to_dict(); temp['표준대분류'] = pure_cat
                         selected_data.append(temp)
 
-    # --- [복구 완료] 사이드바 4단 실시간 수강 현황 ---
+    # --- 사이드바 4단 실시간 수강 현황 (절대 고정) ---
     r_df = pd.DataFrame(selected_data)
     t_h = r_df["시간"].sum() if not r_df.empty else 0.0
     m_h = r_df[r_df["표준대분류"] == "필수교육"]["시간"].sum() if not r_df.empty else 0.0
@@ -188,7 +199,7 @@ if os.path.exists(EXCEL_PATH):
 
     valid = (t_h >= TARGET_TOTAL_HOURS and m_h >= TARGET_MANDATORY_HOURS and c_h >= TARGET_COMMON_HOURS and s_h >= TARGET_SPECIAL_HOURS)
 
-    # 제출 및 구글 시트 누적 로직
+    # 제출 및 구글 시트 누적 로직 (절대 고정)
     if st.session_state.submitted:
         st.sidebar.info("✅ 신청이 완료되었습니다.")
         st.sidebar.button("전송 완료", type="secondary", disabled=True)
@@ -206,11 +217,9 @@ if os.path.exists(EXCEL_PATH):
                 save_cols = ['제출시간', '성함', '업체명', '연락처', '이메일', '구분', '표준대분류', '중분류', '강의명', '시간']
                 save_df = save_df[save_cols]
 
-                # 로컬 CSV 저장
                 if not os.path.exists(SAVE_PATH): save_df.to_csv(SAVE_PATH, index=False, encoding='utf-8-sig')
                 else: save_df.to_csv(SAVE_PATH, mode='a', header=False, index=False, encoding='utf-8-sig')
                 
-                # 구글 시트 누적 저장 (ttl=0)
                 try:
                     existing_data = conn.read(worksheet="Sheet1", ttl=0)
                     updated_data = pd.concat([existing_data, save_df], ignore_index=True)
